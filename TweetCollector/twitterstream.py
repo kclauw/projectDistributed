@@ -4,6 +4,7 @@ from nltk.tokenize import TweetTokenizer
 from nltk.corpus import stopwords
 import re
 import csv
+import json
 
 
 api_key = "MFLZmhylmM8ULVia639mC1EJO"
@@ -54,22 +55,27 @@ def twitterreq(url, method, parameters):
 
 
 def extract_hash_tags(s):
-  return set([re.sub(r"#+", "#", k) for k in set([re.sub(r"(\W+)$", "", j, flags = re.UNICODE) for j in set([i for i in text.split() if i.startswith("#")])])])
+  return re.findall(r"#(\w+)", s)
+  #return set([re.sub(r"#+", "#", k) for k in set([re.sub(r"(\W+)$", "", j, flags = re.UNICODE) for j in set([i for i in text.split() if i.startswith("#")])])])
 
 
 
 def fetchsamples(limit):
   
   tweets = []
-  url = "https://stream.twitter.com/1.1/statuses/sample.json?geocode=-122.995004,-67.799695,49.893813"
+
+  url = "https://stream.twitter.com/1.1/statuses/filter.json?locations=-122.995004,32.323198,-67.799695,49.893813&lang=en"
+  #url = "http://stream.twitter.com/1.1/statuses/filter.json?locations=-122.75,36.8,-121.75,37.8,-74,40,-73,41"
   parameters = []
   response = twitterreq(url, "GET", parameters)
 
   tweets = []
 
-
   for index,line in enumerate(response):
-    tweets.append(line.strip())
+
+    #print(line.strip())
+    tweet = json.loads(line.strip())["text"]
+    tweets.append(tweet)
     if index == limit+1:
         break
 
@@ -79,36 +85,55 @@ def fetchsamples(limit):
 
 def preProcess(tweets):
   #Pre-processing
-  special = ['.', ',', '"', "'", '?', '!', ':', ';', '(', ')', '[', ']', '{', '}','#']
-  determiners = ["the","a","an","another","for","nor","but","or","yet","so","in","under","towards","before"]
-  stop = set(stopwords.words('english'))
-  stop.update(determiners)
-  stop.update(special) 
+  #Remove the non-character symbols
   tknzr = TweetTokenizer(strip_handles=True, reduce_len=True)
-  tweets = [tknzr.tokenize(item.lower()) for item in tweets]
+  #tweets = [tknzr.tokenize(item.lower()) for item in tweets]
+
+  tweets = [" ".join(re.findall("[a-zA-Z]+", word)) for word in tweets]
+  #tweets = [tknzr.tokenize(item.lower()) for item in tweets]
+
+  #special = ['.', ',', '"', "'", '?', '!', ':', ';', '(', ')', '[', ']', '{', '}','#']
+  #determiners = ["the","a","an","another","for","nor","but","or","yet","so","in","under","towards","before"]
+  #stop = set(stopwords.words('english'))
+ # stop.update(determiners)
+ # stop.update(special) 
+ # tknzr = TweetTokenizer(strip_handles=True, reduce_len=True)
+  #tweets = [tknzr.tokenize(item.lower()) for item in tweets]
   return tweets
 
 def extractTweets(tweets):
   hashtags = []
   for sentence in tweets:
-    for word in sentence:
-        if word.startswith('#') and len(word) > 4:
-          hashtags.append(word[1:])
+    for word in sentence.split():
+      #print(word)
+      if word[0] == "#":
+        filtered_tag = " ".join(re.findall("[a-zA-Z]+", word))
+        hashtags.append(filtered_tag)
+    #print(extract_hash_tags(sentence))
+    #hashtags.append(extract_hash_tags(sentence))
+
   return hashtags
 
 
 if __name__ == '__main__':
 
   #Retrieve tweets
-  tweets = fetchsamples(25000)
 
+  tweets = fetchsamples(5)
+  #print(tweets)
+  #print(tweets)
+  #print()
   tweets = preProcess(tweets)
   hashtags = extractTweets(tweets) 
- 
 
   with open('tweets.csv', 'wb') as tweetFile:
-    wr = csv.writer(tweetFile, quoting=csv.QUOTE_ALL)
-    wr.writerow(hashtags)
+    for word in tweets:
+      print(word)
+#      wr = csv.writer(tweetFile)
+#      wr.writerow([word])
 
-
+  with open('hashtags.csv', 'wb') as tagFile:
+    for tag in hashtags:
+      wr = csv.writer(tagFile)
+      wr.writerow([tag])
   
